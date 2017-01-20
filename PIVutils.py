@@ -130,7 +130,7 @@ def findBlobs(S,Thresh=None):
     Now new and improved! and much faster!
     
     Inputs:
-    S - sets of 2D scalar fields that have already been thresholded (0s or 1s)
+    S - sets of 2D scalar fields that have already been thresholded (0s or 1s). The third dimension denotes the frame
     Thresh - Number of vectors that must be contained in a blob. If not defined, then no threshold filter will be used
     
     Outputs:
