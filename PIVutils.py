@@ -199,7 +199,7 @@ def findBlobs(S,Thresh=None):
     return [num_features_out, features_per_frame, labeled_array_out, cent]
 
 # given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame
-def getThumbnails(S,frame):
+def getThumbnails(U,V,cent,frame):
     '''
     Given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame. 
     All vectors inside frame but outside domain are padded with nans
