@@ -19,7 +19,6 @@ def plotPODmodes2D(X,Y,Umodes,Vmodes,plotModes):
     '''
 
     import matplotlib.pyplot as plt
-
     
     #assert plotModes.max()<=Umodes.shape[2], 'You asked for more modes than were calculated'
     assert Umodes.shape[2]==Vmodes.shape[2], 'There are different numbers of U and V modes. Thats not right...'
