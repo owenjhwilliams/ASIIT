@@ -41,7 +41,7 @@ def importMatlabPIVdata2D(path,mats,structs):
     return ret
 
 #Plot 2D scalar field 
-def plotScalarField(X,Y,S,bound=None):
+def plotScalarField(S,X=None,Y=None,bound=None):
     '''
     Plot 2D scalar fields
     
@@ -60,13 +60,20 @@ def plotScalarField(X,Y,S,bound=None):
     
     if bound is None:
         bound = np.round(np.max(np.absolute(S))/5)
-    
+        
     f = plt.figure(figsize = [8,3])
-    plt.pcolor(X,Y,S, cmap='RdBu_r');
+    if X is None:
+        plt.pcolor(S, cmap='RdBu_r');
+        plt.axis('scaled')
+        plt.xlim([0, S.shape[1]])
+        plt.ylim([0, S.shape[0]])
+    else:
+        plt.pcolor(X,Y,S, cmap='RdBu_r');
+        plt.axis('scaled')
+        plt.xlim([X.min(), X.max()])
+        plt.ylim([Y.min(), Y.max()])
+        
     plt.clim([-1*bound, bound])
-    plt.axis('scaled')
-    plt.xlim([X.min(), X.max()])
-    plt.ylim([Y.min(), Y.max()])
     plt.colorbar()
     
     return [f, plt.gca()]
@@ -209,3 +216,5 @@ def getThumbnails(U,V,cent,frame):
     Outputs:
     
     '''
+    
+    #for i in cent
