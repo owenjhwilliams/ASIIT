@@ -206,7 +206,7 @@ def findBlobs(S,Thresh=None):
     return [num_features_out, features_per_frame, labeled_array_out, cent]
 
 # given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame
-def getThumbnails(U,V,cent,frame):
+def getThumbnails2D(Uf,Vf,Sf,cent,BoxSize):
     '''
     Given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame. 
     All vectors inside frame but outside domain are padded with nans
@@ -216,5 +216,51 @@ def getThumbnails(U,V,cent,frame):
     Outputs:
     
     '''
+    import numpy as np
     
-    #for i in cent
+    uSize = Uf.shape
+    
+    #find out how many features there are 
+    #Round all centroids to integers
+    num_features = 0
+    for i in range(len(cent)):
+        for j in range(len(cent[i])):
+            #print(i, j)
+            cent[i][j] = (int(round(cent[i][j][0])), int(round(cent[i][j][1])))
+            num_features += 1
+    
+    #initialize thumbnail matrices
+    Ut = np.zeros([2*BoxSize+1,2*BoxSize+1,num_features])    
+    Ut[:] = np.NAN
+    Vt = Ut.copy()
+    St = Ut.copy()
+    #print(Ut.shape)
+    
+    #pad out velocity fields so that there are NaNs around in all directions
+    Uf2 = np.zeros([uSize[0]+2*BoxSize,uSize[1]+2*BoxSize,uSize[2]])    
+    Uf2[:] = np.NAN
+    Vf2 = Uf2.copy()
+    Sf2 = Uf2.copy()
+
+    Uf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Uf.copy()
+    Vf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Vf.copy()
+    Sf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Sf.copy()
+    
+    #print(Uf.shape)
+    #print(Uf2.shape)
+            
+    #[f, ax] = PIVutils.plotScalarField(Sf2[:,:,0],bound=10)
+
+    #for i in range(features_per_frame[1]):
+        #plt.plot(cent[0][i][1]+BoxSize,cent[0][i][0]+BoxSize,'oy',markersize=4,markeredgecolor=None)
+        
+    #Now get the thumbnails
+    thumb = 0
+    for i in range(len(cent)):
+        for j in range(len(cent[i])):
+            Ut[:,:,thumb] = Uf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i]  
+            Vt[:,:,thumb] = Vf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i] 
+            St[:,:,thumb] = Sf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i]  
+            thumb+=1
+            
+    return [Ut, Vt, St]
