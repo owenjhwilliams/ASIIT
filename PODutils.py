@@ -104,3 +104,52 @@ def plotPODmodes3D(X,Y,Umodes,Vmodes,Wmodes,plotModes):
         im3.set_clim(-1*max(map(abs,cbar3.get_clim())), max(map(abs,cbar3.get_clim()))) 
         
         del im1,im2,im3,cbar1,cbar2,cbar3
+
+#Reorganize modes matrix so that the modes can be easily plotted
+def reconstructPODmodes(modes,uSize,num_modes,numC):
+    '''
+    Reconstruct the mode shapes for three component single plane data
+    
+    Inputs: 
+    modes - outout from mr.compute_POD_matrices_snaps_method
+    uSize - size of original velocity dataset
+    num_modes - number of modes calculated by mr.compute_POD_matrices_snaps_method
+    numC - number of velocity components
+    
+    Output:
+    Umodes, Vmodes and optionally Wmodes
+    '''       
+    import numpy as np
+    
+    #Rearrange mode data to get mode fields
+    modeSize = modes.shape
+    Umodes = modes[0:uSize[0]*uSize[1],:];
+    Umodes2 = np.zeros((uSize[0],uSize[1],num_modes))
+    
+    if numC >= 2:
+        Vmodes = modes[uSize[0]*uSize[1]:2*uSize[0]*uSize[1],:];
+        Vmodes2 = np.zeros((uSize[0],uSize[1],num_modes))
+    if numC >= 3:
+        Wmodes = modes[2*uSize[0]*uSize[1]:modeSize[0]+1,:];
+        Wmodes2 = np.zeros((uSize[0],uSize[1],num_modes))
+
+    Umodes.shape
+    
+
+    for i in range(num_modes):
+        #i=1
+        Umodes2[:,:,i] = np.reshape(Umodes[:,i],(uSize[0],uSize[1]))
+        if numC >=2:
+            Vmodes2[:,:,i] = np.reshape(Vmodes[:,i],(uSize[0],uSize[1]))
+        if numC >=3:
+            Wmodes2[:,:,i] = np.reshape(Vmodes[:,i],(uSize[0],uSize[1]))        
+
+        #Umodes.shape
+        #uSize[0]*uSize[1]
+    if numC == 1:
+        return [Umodes2]
+    elif numC == 2:
+        return [Umodes2, Vmodes2]
+    elif numC == 3:
+        return [Umodes2, Vmodes2, Wmodes2]
+        

@@ -4,7 +4,7 @@ Most functions are for 2D data.
 '''
 
 #Import matlab PIV data
-def importMatlabPIVdata2D(path,mats,structs):
+def importMatlabPIVdata(path,mats,structs):
     '''
     Plot 2D scalar fields
     
@@ -32,11 +32,13 @@ def importMatlabPIVdata2D(path,mats,structs):
         else:
             Temp = np.transpose(Temp,(2,1,0))
         ret.append(Temp)
+        del Temp
 
     for i in structs:
         TempS = {k : f[i][k].value[0]       #Generate a dictionary linking all values in cond with their names
              for k in f[i].keys()}
         ret.append(TempS)
+        del TempS
         
     return ret
 
@@ -196,6 +198,14 @@ def findBlobs(S,Thresh=None):
     else:
         labeled_array_out = labeled_array
         num_features_out = num_features
+        
+    #a = labeled_array_out[:,:,535]
+    #b = a.copy()
+    #c = list(range(uSize[1]))
+    #b[:,:] = list(range(uSize[1])))
+    #for i in np.unique(a):
+        #print(np.unique(a)[15])
+        #print(a[a==i])
             
     features_per_frame = np.zeros(uSize[2],dtype=int);
     cent = [];
