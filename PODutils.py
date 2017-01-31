@@ -153,3 +153,75 @@ def reconstructPODmodes(modes,uSize,num_modes,numC):
     elif numC == 3:
         return [Umodes2, Vmodes2, Wmodes2]
         
+#Plot heatmaps of POD coefficients
+def plotPODcoeff(C,modes,num_bins,logscale=None):
+    '''
+    Reconstruct the mode shapes for three component single plane data
+    
+    Inputs: 
+    C - matrix of coefficients (mode number, coefficent for each frame) 
+    modes - indices of modes to be plotted 
+    num_bins - size of bins to be plotted. Passed to hexbin
+    logscale - describing whether or not to do the heatmap in a log scale
+    
+    Output:
+    plots a grid of hexbin plots for each mode
+    '''       
+    import numpy as np
+    from scipy.interpolate import griddata
+    import matplotlib.pyplot as plt
+    
+    bound = round(np.max(np.absolute(C)))
+    xedges = np.linspace(-1*bound, bound, num=num_bins)
+    yedges = xedges;
+    bound = 0.5*(xedges[1]+xedges[2]);
+    
+    Z, xedges, yedges = np.histogram2d(C[0], C[1], bins=(xedges, yedges))
+    xv, yv = np.meshgrid(0.5*(xedges[1:]+xedges[:-1]), 0.5*(yedges[1:]+yedges[:-1]))
+
+    fig, axs = plt.subplots(ncols=len(modes)-1,nrows=len(modes)-1,figsize=(4.5, 6))
+    fig.subplots_adjust(hspace=0.01, left=0.01, right=1)
+    
+    #print(axs.shape)
+
+    for i in range(len(modes)-1):
+        for j in range(len(modes)-1):
+            ax = axs[i,j]
+            if j>=i:
+                Z, xedges, yedges = np.histogram2d(C[i], C[j+1], bins=(xedges, yedges))
+                hb = ax.pcolor(xv, yv, Z, cmap='OrRd')
+                
+                if i == 0:
+                    ax.set_xlabel('C{0}'.format(j+2))
+                    ax.xaxis.tick_top()
+                    ax.xaxis.set_label_position("top")
+                    ax.tick_params(axis='x', labelsize=7)
+                else:
+                    ax.set_xticklabels([])
+
+                    
+                if j == len(modes)-2:
+                    ax.yaxis.tick_right()
+                    ax.set_ylabel('C{0}'.format(i+1))
+                    ax.yaxis.set_label_position("right")
+                    ax.tick_params(axis='y', labelsize=7)
+                else:
+                    ax.set_yticklabels([])
+                    
+                ax.set_xlim(bound,-1*bound)
+                ax.set_ylim(bound,-1*bound)
+                
+                ax.set_aspect("equal")
+                ax.set_adjustable("box-forced")
+
+                #fig = plt.figure(figsize = [8,3])
+                #hb = ax.hexbin(C[0], C[1], gridsize=10, cmap='OrRd')
+                #plt.axis([-1*bound, bound, -1*bound, bound])
+                #plt.axis('scaled')
+                #cb = fig.colorbar(hb, ax=ax)
+                #cb.set_label('counts')
+                #cb.set_label('log10(N)')
+            else:
+                ax.axis('off')
+                
+                
