@@ -179,7 +179,7 @@ def plotPODcoeff(C,modes,num_bins,logscale=None):
     Z, xedges, yedges = np.histogram2d(C[0], C[1], bins=(xedges, yedges))
     xv, yv = np.meshgrid(0.5*(xedges[1:]+xedges[:-1]), 0.5*(yedges[1:]+yedges[:-1]))
 
-    fig, axs = plt.subplots(ncols=len(modes)-1,nrows=len(modes)-1,figsize=(4.5, 6))
+    fig, axs = plt.subplots(ncols=len(modes)-1,nrows=len(modes)-1,figsize=(9, 12))
     fig.subplots_adjust(hspace=0.01, left=0.01, right=1)
     
     #print(axs.shape)
