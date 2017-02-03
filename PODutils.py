@@ -154,7 +154,7 @@ def reconstructPODmodes(modes,uSize,num_modes,numC):
         return [Umodes2, Vmodes2, Wmodes2]
         
 #Plot heatmaps of POD coefficients
-def plotPODcoeff(C,modes,num_bins,logscale=None):
+def plotPODcoeff(C,modes,num_bins,bound=None,logscale=None):
     '''
     Reconstruct the mode shapes for three component single plane data
     
@@ -162,6 +162,7 @@ def plotPODcoeff(C,modes,num_bins,logscale=None):
     C - matrix of coefficients (mode number, coefficent for each frame) 
     modes - indices of modes to be plotted 
     num_bins - size of bins to be plotted. Passed to hexbin
+    bound - the axis bound. If none taken to be max coefficient
     logscale - describing whether or not to do the heatmap in a log scale
     
     Output:
@@ -171,7 +172,9 @@ def plotPODcoeff(C,modes,num_bins,logscale=None):
     from scipy.interpolate import griddata
     import matplotlib.pyplot as plt
     
-    bound = round(np.max(np.absolute(C)))
+    if bound == None:
+        bound = round(np.max(np.absolute(C)))
+    
     xedges = np.linspace(-1*bound, bound, num=num_bins)
     yedges = xedges;
     bound = 0.5*(xedges[1]+xedges[2]);
@@ -188,8 +191,14 @@ def plotPODcoeff(C,modes,num_bins,logscale=None):
         for j in range(len(modes)-1):
             ax = axs[i,j]
             if j>=i:
-                Z, xedges, yedges = np.histogram2d(C[i], C[j+1], bins=(xedges, yedges))
-                hb = ax.pcolor(xv, yv, Z, cmap='OrRd')
+                Z, xedges, yedges = np.histogram2d(C[i],C[j+1], bins=(xedges, yedges))
+                if logscale == None:
+                    hb = ax.pcolor(xv, yv, Z, cmap='hsv')
+                else:
+                    hb = ax.pcolor(xv, yv, np.log(Z+1), cmap='hsv')
+                    
+                ax.plot([-1*bound, bound],[0, 0],'--k')
+                ax.plot([0, 0],[-1*bound, bound],'--k')
                 
                 if i == 0:
                     ax.set_xlabel('C{0}'.format(j+2))
@@ -223,5 +232,68 @@ def plotPODcoeff(C,modes,num_bins,logscale=None):
                 #cb.set_label('log10(N)')
             else:
                 ax.axis('off')
-                
-                
+           
+        
+#Plot heatmaps of POD coefficients
+def plotYposPODcoeff(ypos,C,modes,num_bins,bound=None,logscale=None):
+    '''
+    Reconstruct the mode shapes for three component single plane data
+    
+    Inputs: 
+    ypos - wall-normal position of each thumbnail. [0 1]
+    C - matrix of coefficients (mode number, coefficent for each frame) 
+    modes - indices of modes to be plotted 
+    num_bins - size of bins to be plotted. Passed to hexbin
+    bound - the axis bound. If none taken to be max coefficient
+    logscale - describing whether or not to do the heatmap in a log scale
+    
+    Output:
+    plots a grid of hexbin plots for each mode
+    '''       
+    import numpy as np
+    from scipy.interpolate import griddata
+    import matplotlib.pyplot as plt
+    
+    if bound == None:
+        bound = round(np.max(np.absolute(C)))
+    
+    #xedges = np.linspace(0, 1, num=num_bins);
+    xedges = ypos
+    xedges = np.concatenate([[xedges[0]-(xedges[1]-xedges[0])],xedges, [xedges[-1]+xedges[-1]-xedges[-2]]])
+    #print(xedges)
+    yedges = np.linspace(-1*bound, bound, num=num_bins);
+    #bound = 0.5*(xedges[1]+xedges[2]);
+    
+    Z, xedges, yedges = np.histogram2d(C[0],C[1], bins=(xedges, yedges))
+    xv, yv = np.meshgrid(0.5*(xedges[1:]+xedges[:-1]),0.5*(yedges[1:]+yedges[:-1]))
+    
+    fig, axs = plt.subplots(nrows=len(modes),figsize=(3, 3*len(modes)))
+    fig.subplots_adjust(hspace=0.1, left=0.1, right=1)
+    
+    #print(axs.shape)
+
+    for i in range(len(modes)):
+        ax = axs[i]
+
+        Z, xedges, yedges = np.histogram2d(C[0],C[i+1], bins=(xedges, yedges))
+        Z = Z.T
+        if logscale == None:
+            hb = ax.pcolor(xv, yv, Z, cmap='hsv')
+        else:
+            hb = ax.pcolor(xv, yv, np.log(Z+1), cmap='hsv')
+
+        ax.plot([-1*bound, bound],[0, 0],'--k')
+
+        if i == len(modes)-1:
+            ax.set_xlabel('y/delta')
+            ax.tick_params(axis='x', labelsize=7)
+        else:
+            ax.set_xticklabels([])
+
+        ax.set_ylabel('C{0}'.format(i+1))
+        ax.tick_params(axis='y', labelsize=7)
+
+        ax.set_xlim(0,max(ypos))
+        ax.set_ylim(-1*bound,bound)
+
+
