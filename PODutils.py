@@ -3,7 +3,7 @@ This is a set of utility funcitons useful for analysing POD data. Plotting and d
 '''
 
 #Plot 2D POD modes 
-def plotPODmodes2D(X,Y,Umodes,Vmodes,plotModes):
+def plotPODmodes2D(X,Y,Umodes,Vmodes,plotModes,saveFolder = None):
     '''
     Plot 2D POD modes
     
@@ -46,10 +46,14 @@ def plotPODmodes2D(X,Y,Umodes,Vmodes,plotModes):
         cbar2 = f.colorbar(im2,ax=ax[1])
         im2.set_clim(-1*max(map(abs,cbar2.get_clim())), max(map(abs,cbar2.get_clim()))) 
         
+        if saveFolder is not None:
+            f.savefig(saveFolder + '/Mode' + str(i+1) + '.tif', transparent=True, bbox_inches='tight', pad_inches=0)
+        
         del im1,im2,cbar1,cbar2
+        
 
 #Plot 3D POD modes 
-def plotPODmodes3D(X,Y,Umodes,Vmodes,Wmodes,plotModes):
+def plotPODmodes3D(X,Y,Umodes,Vmodes,Wmodes,plotModes,saveFolder=None):
     '''
     Plot 2D POD modes
     
@@ -103,6 +107,9 @@ def plotPODmodes3D(X,Y,Umodes,Vmodes,Wmodes,plotModes):
         cbar3 = f.colorbar(im3,ax=ax[2])
         im3.set_clim(-1*max(map(abs,cbar3.get_clim())), max(map(abs,cbar3.get_clim()))) 
         
+        if saveFolder is not None:
+            f.savefig(saveFolder + '/Mode' + str(i+1) + '.tif', transparent=True, bbox_inches='tight', pad_inches=0)
+        
         del im1,im2,im3,cbar1,cbar2,cbar3
 
 #Reorganize modes matrix so that the modes can be easily plotted
@@ -154,7 +161,7 @@ def reconstructPODmodes(modes,uSize,num_modes,numC):
         return [Umodes2, Vmodes2, Wmodes2]
         
 #Plot heatmaps of POD coefficients
-def plotPODcoeff(C,modes,num_bins,bound=None,logscale=None):
+def plotPODcoeff(C,modes,num_bins,bound=None,logscale=None,saveFolder=None):
     '''
     Reconstruct the mode shapes for three component single plane data
     
@@ -232,10 +239,13 @@ def plotPODcoeff(C,modes,num_bins,bound=None,logscale=None):
                 #cb.set_label('log10(N)')
             else:
                 ax.axis('off')
+                
+    if saveFolder is not None:
+        fig.savefig(saveFolder, transparent=True, bbox_inches='tight', pad_inches=0)
            
         
 #Plot heatmaps of POD coefficients
-def plotYposPODcoeff(ypos,C,modes,num_bins,bound=None,logscale=None):
+def plotYposPODcoeff(ypos,C,modes,num_bins,bound=None,logscale=None,saveFolder=None):
     '''
     Reconstruct the mode shapes for three component single plane data
     
@@ -285,7 +295,7 @@ def plotYposPODcoeff(ypos,C,modes,num_bins,bound=None,logscale=None):
         ax.plot([-1*bound, bound],[0, 0],'--k')
 
         if i == len(modes)-1:
-            ax.set_xlabel('y/delta')
+            ax.set_xlabel('$y/\delta$')
             ax.tick_params(axis='x', labelsize=7)
         else:
             ax.set_xticklabels([])
@@ -295,5 +305,97 @@ def plotYposPODcoeff(ypos,C,modes,num_bins,bound=None,logscale=None):
 
         ax.set_xlim(0,max(ypos))
         ax.set_ylim(-1*bound,bound)
+        
+    if saveFolder is not None:
+        fig.savefig(saveFolder, transparent=True, bbox_inches='tight', pad_inches=0)
 
+#Plot heatmaps of POD coefficients
+def plotLLEscatter(C,ypos,St,modes,bound=None,thumb_frac=None,VecDist=None,saveFolder=None):
+    '''
+    Reconstruct the mode shapes for three component single plane data
+    
+    Inputs: 
+    C - matrix of coefficients (mode number, coefficent for each frame) 
+    ypos - distance from the wall for each thumbnail
+    St - thumbnail data (not necessarily velocity, should use swirl)
+    modes - indices of modes to be plotted 
+    bound - the axis bound. If none taken to be max coefficient
+    thumb_frac - fraction of thumbnails to show
+    VecDist - length of each thumbnail vector pointing to coefficient location
+    
+    Output:
+    plots a grid of hexbin plots for each mode
+    '''       
+    import numpy as np
+    #from scipy.interpolate import griddata
+    import matplotlib.pyplot as plt
+    from matplotlib import offsetbox,colors
+    
+    if bound == None:
+        bound = round(np.max(np.absolute(C)))
+    if thumb_frac == None:
+        thumb_frac = 0.5
+    if VecDist == None:
+        VecDist = 0.05
 
+    fig, axs = plt.subplots(ncols=len(modes)-1,nrows=len(modes)-1,figsize=(9, 12))
+    fig.subplots_adjust(hspace=0.01, left=0.01, right=1)
+    
+    colorize = dict(c=ypos, cmap=plt.cm.get_cmap('rainbow', 100))
+    cmap='RdBu_r'
+    
+    C2 = C.copy().T
+    
+    for i in range(len(modes)-1):
+        for j in range(len(modes)-1):
+            ax = axs[i,j]
+            if j>=i:
+                hb = ax.scatter(C[i], C[j+1],s=2, facecolor='0.5', lw = 0, **colorize)
+                    
+                ax.plot([-1*bound, bound],[0, 0],'--k')
+                ax.plot([0, 0],[-1*bound, bound],'--k')
+               
+                if i == 0:
+                    ax.set_xlabel('C{0}'.format(j+2))
+                    ax.xaxis.tick_top()
+                    ax.xaxis.set_label_position("top")
+                    ax.tick_params(axis='x', labelsize=7)
+                else:
+                    ax.set_xticklabels([])
+
+                    
+                if j == len(modes)-2:
+                    ax.yaxis.tick_right()
+                    ax.set_ylabel('C{0}'.format(i+1))
+                    ax.yaxis.set_label_position("right")
+                    ax.tick_params(axis='y', labelsize=7)
+                else:
+                    ax.set_yticklabels([])
+                    
+                ax.set_xlim(bound,-1*bound)
+                ax.set_ylim(-1*bound,bound)
+                
+                ax.set_aspect("equal")
+                ax.set_adjustable("box-forced")
+                
+                
+                min_dist_2 = (thumb_frac * max(C2.max(0) - C2.min(0))) ** 2
+                shown_images = np.array([2 * C2.max(0)])
+                for k in range(C2.shape[0]):
+                    dist = np.sum((C2[k] - shown_images) ** 2, 1)
+                    if np.min(dist) < min_dist_2:
+                        # don't show points that are too close
+                        continue
+                    shown_images = np.vstack([shown_images, C2[k]])
+
+                    vecNorm = (C2[k,i]**2 + C2[k,j+1]**2)**0.5
+                    imagebox = offsetbox.AnnotationBbox(
+                        offsetbox.OffsetImage(St[:,:,k], cmap=cmap, norm=colors.Normalize(-50,50),zoom=1.5),
+                                              xybox=VecDist*C2[k,[i,j+1]]/vecNorm+C2[k,[i,j+1]],xy=C2[k,[i,j+1]],       arrowprops=dict(arrowstyle="->"))
+                    ax.add_artist(imagebox)
+            else:
+                ax.axis('off')
+                
+    if saveFolder is not None:
+        fig.savefig(saveFolder, transparent=True, bbox_inches='tight', pad_inches=0)
+           

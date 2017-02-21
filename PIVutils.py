@@ -19,9 +19,13 @@ def importMatlabPIVdata(path,mats,structs):
     
     import numpy as np
     import h5py
+    import pandas
 
     f = h5py.File(path)
-    #list(f.keys())
+    
+    print(list(f.keys()))
+    
+    Temp = np.asarray(['Swirl'])
     
     ret = []
 
@@ -43,7 +47,7 @@ def importMatlabPIVdata(path,mats,structs):
     return ret
 
 #Plot 2D scalar field 
-def plotScalarField(S,X=None,Y=None,bound=None):
+def plotScalarField(S,X=None,Y=None,bound=None,saveFolder=None):
     '''
     Plot 2D scalar fields
     
@@ -77,6 +81,9 @@ def plotScalarField(S,X=None,Y=None,bound=None):
         
     plt.clim([-1*bound, bound])
     plt.colorbar()
+    
+    if saveFolder is not None:
+        f.savefig(saveFolder, transparent=True, bbox_inches='tight', pad_inches=0)
     
     return [f, plt.gca()]
 
@@ -133,7 +140,7 @@ def findBlobsSlow(S,Thresh=None):
     return [num_features, features_per_frame, labeled_array, cent]
 
 #Gets locations of distinct scalar blobs in each frame that are bigger than a certain threshold (in number of vectors)
-def findBlobs(S,Thresh=None):
+def findBlobs(S,Thresh=None,EdgeBound=None):
     '''
     Finds distinct blobs of a scalar that are bigger than a certain size (Thresh)
     Now new and improved! and much faster!
@@ -141,10 +148,11 @@ def findBlobs(S,Thresh=None):
     Inputs:
     S - sets of 2D scalar fields that have already been thresholded (0s or 1s). The third dimension denotes the frame
     Thresh - Number of vectors that must be contained in a blob. If not defined, then no threshold filter will be used
+    EdgeBound - Crops all blobs that are too close to the edge of the domain. No crop if left as none. 
     
     Outputs:
     cent - 
-    labelled_array - The labeled array of blobs (in format of ndimage.measurements.label function)
+    labelled_array - The labeled array of blobs (in format of ndimage.measurements.label function). This is all the labels including the ones that might be too close to edge of domain
     num_features - Total number of features accross datasets
     features_per frame - Number of features identified in each frame
     
@@ -212,6 +220,26 @@ def findBlobs(S,Thresh=None):
     for i in range(uSize[2]):
         features_per_frame[i] = len(np.unique(labeled_array_out[:,:,i])[1:])
         cent.append(center_of_mass(S[:,:,i],labeled_array_out[:,:,i],np.unique(labeled_array_out[:,:,i])[1:]))
+        
+    #Round center locations to nearest index
+    for i in range(len(cent)):
+        for j in range(len(cent[i])):
+            cent[i][j] = (int(round(cent[i][j][0])), int(round(cent[i][j][1])))
+    
+    #Remove all centers too close to edge of domain
+    if EdgeBound is not None:
+        newCent = []
+        for i in range(len(cent)):
+            newCent.append([])
+            features_per_frame[i] = 0
+            for j in range(len(cent[i])):
+                if (cent[i][j][0]>EdgeBound-1 and cent[i][j][0]<uSize[0]-EdgeBound) and (cent[i][j][1]>EdgeBound-1 and cent[i][j][1] <uSize[1]-EdgeBound):
+                    newCent[i].append(cent[i][j])
+                    features_per_frame[i]+=1
+        num_features_out = sum(features_per_frame)
+        cent = newCent
+        
+        print('Of these', num_features_out, ' are far enough away from edge of domain')
 
     return [num_features_out, features_per_frame, labeled_array_out, cent]
 
@@ -274,3 +302,180 @@ def getThumbnails2D(Uf,Vf,Sf,cent,BoxSize):
             thumb+=1
             
     return [Ut, Vt, St]
+
+# given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame
+def getThumbnails2D_noEdge(Uf,Vf,Sf,cent,BoxSize):
+    '''
+    Given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame. 
+    Domain is no longer padded with nans. A thumbnail is only taken if the center of the vortex is far enough from the frame    edges. 
+    
+    Inputs:
+    
+    Outputs:
+    
+    '''
+    import numpy as np
+    
+    uSize = Uf.shape
+    
+    #find out how many features there are 
+    #Round all centroids to integers
+    num_features = 0
+    for i in range(len(cent)):
+        for j in range(len(cent[i])):
+            #print(i, j)
+            cent[i][j] = (int(round(cent[i][j][0])), int(round(cent[i][j][1])))
+            num_features += 1
+    
+    #initialize thumbnail matrices
+    Ut = np.zeros([2*BoxSize+1,2*BoxSize+1,num_features])    
+    Ut[:] = np.NAN
+    Vt = Ut.copy()
+    St = Ut.copy()
+    #print(Ut.shape)
+    
+    #Now get the thumbnails
+    thumb = 0
+    for i in range(len(cent)):
+        for j in range(len(cent[i])):
+            if (cent[i][j][0]>BoxSize-1 and cent[i][j][0]<uSize[0]-BoxSize) and (cent[i][j][1]>BoxSize-1 and cent[i][j][1] <uSize[1]-BoxSize):
+                Ut[:,:,thumb] = Uf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]
+                Vt[:,:,thumb] = Vf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]
+                St[:,:,thumb] = Sf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]  
+                thumb+=1
+            
+    num_features = thumb-1
+    return [Ut, Vt, St, num_features]
+
+def getRandomThumbnails2D(Uf,Vf,Sf,numSamp,BoxSize):
+    import numpy as np
+    
+    uSize = Uf.shape
+    
+    Pos = np.random.rand(3,numSamp)
+    Pos[0] = Pos[0]*(uSize[0]-2*BoxSize-1)+BoxSize
+    Pos[1] = Pos[1]*(uSize[1]-2*BoxSize-1)+BoxSize
+    Pos[2] = Pos[2]* (uSize[2]-1)
+    Pos = Pos.round().astype(int)
+    
+    #print(Pos[:,0])
+    #print(np.ndarray.min(Pos[0]))
+    #print(np.ndarray.max(Pos[0]))
+    #print(np.ndarray.min(Pos[1]))
+    #print(np.ndarray.max(Pos[1]))
+    #print(np.ndarray.min(Pos[2]))
+    #print(np.ndarray.max(Pos[2]))
+    #print(max(Pos))
+    
+    #initialize thumbnail matrices
+    Ut = np.zeros([2*BoxSize+1,2*BoxSize+1,numSamp])    
+    Ut[:] = np.NAN
+    Vt = Ut.copy()
+    St = Ut.copy()
+    #print(Ut.shape)
+    
+    #pad out velocity fields so that there are NaNs around in all directions
+    Uf2 = np.zeros([uSize[0]+2*BoxSize,uSize[1]+2*BoxSize,uSize[2]])    
+    Uf2[:] = np.NAN
+    Vf2 = Uf2.copy()
+    Sf2 = Uf2.copy()
+
+    Uf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Uf.copy()
+    Vf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Vf.copy()
+    Sf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Sf.copy()
+    
+    #Now get the thumbnails
+    thumb = 0
+    for i in range(numSamp):
+        #print(i)
+        Ut[:,:,thumb] = Uf2[Pos[0,i]:Pos[0,i]+2*BoxSize+1,Pos[1,i]:Pos[1,i]+2*BoxSize+1,Pos[2,i]]  
+        Vt[:,:,thumb] = Vf2[Pos[0,i]:Pos[0,i]+2*BoxSize+1,Pos[1,i]:Pos[1,i]+2*BoxSize+1,Pos[2,i]] 
+        St[:,:,thumb] = Sf2[Pos[0,i]:Pos[0,i]+2*BoxSize+1,Pos[1,i]:Pos[1,i]+2*BoxSize+1,Pos[2,i]]  
+        thumb+=1
+            
+    return [Ut, Vt, St]
+
+def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
+    '''
+    Generates a theoretical hairpin vortex velocity field given a number of parameters. Returns U and V velocity fields
+    
+    Inputs:
+    BoxSize - 2*Boxsize+1 is the number of vectors per side of box. 
+    Circ - Circulation strength of vortex 
+    r - diameter of vortex solid body rotation (constant vector magnitude outside core)
+    xs, ys - x and y locations of stagnation point
+    Rot - Rotation of stagnation point shear layer
+    StagStren - Vector magnitude of stagnation point velocity field (constant magnitude)
+    Gvort - Width of blending gaussian for vortex
+    Gstag - Width of blending gaussian for stagnation point
+    Conv - Convective velocity of this vortex relative to the local mean
+    
+    Outputs:
+    U - Streamwise velocity field
+    V - Wall-normal velocity field
+    '''
+    
+    import numpy as np
+    import math
+    
+    X, Y = np.meshgrid(np.arange(-1*BoxSize, BoxSize+1), np.arange(-1*BoxSize, BoxSize+1))
+
+    U = np.zeros([2*BoxSize+1,2*BoxSize+1])
+    V = U.copy()
+    R = np.hypot(X, Y)
+    T = np.arctan2(Y,X)
+    
+    #Create Rankine Vortex
+    Circ = 30
+    r = 3
+
+    Ut = Circ*R/(2*np.pi*r**2)
+    #Ut[R>=r] = Circ/(2*np.pi*R[R>=r])
+    Ut[R>=r] = Circ/(2*np.pi*r)      #make velocities constant outside core
+
+    #Now convert back to cartesian velocities
+    Uvort = Ut*np.sin(T)
+    Vvort = -1*Ut*np.cos(T)
+
+    #Create stagnation point flow
+    Rot = 45*np.pi/180*2 #Degrees of rotation
+    xs = -8            #shift in stagnation point in x
+    ys = -3            #shift in stagnation point in y
+    StagStren = 2;
+
+    Xs = X-xs
+    Ys = Y-ys;
+    Ts = np.arctan2(Ys,Xs)
+
+    M = np.hypot(Xs, Ys)
+    U = M*np.cos(Ts-Rot)
+    V = -1*M*np.sin(Ts-Rot)
+    M = np.hypot(U, V)
+    Ustag = U/M*StagStren
+    Vstag = V/M*StagStren
+
+    Ustag[np.isnan(U)] = 0
+    Vstag[np.isnan(V)] = 0
+    
+    #Combine fields 
+    Gvort_x = 5      #Radius of gaussian weighting function for vortex field
+    Gvort_y = Gvort_x
+    Gstag = 5      #Radius of gaussian weighting function for stagnation point field
+
+    Wvort = np.exp(-((X**2)/(2*Gvort_x)+(Y**2)/(2*Gvort_y)))
+    Wvort_inv = -1*Wvort+1                #invert the weightings so that only vortex appears at vortex location                       
+
+    Rstag = np.hypot(Xs, Ys)
+    Wstag = np.exp(-((X-xs)**2/(2*Gstag)+(Y-ys)**2/(2*Gstag)))
+    Wstag_inv = -1*Wstag+1
+
+    #U = (Wvort*Uvort+Wstag*Ustag)/(Wvort+Wstag)
+    #V = (Wvort*Vvort+Wstag*Vstag)/(Wvort+Wstag)
+
+    U = (Wvort*Wstag_inv*Uvort+Wstag*Wvort_inv*Ustag)/(Wvort*Wstag_inv+Wstag*Wvort_inv)+Conv
+    V = (Wvort*Wstag_inv*Vvort+Wstag*Wvort_inv*Vstag)/(Wvort*Wstag_inv+Wstag*Wvort_inv)
+
+    #U = (Wstag_inv*Uvort+Wvort_inv*Ustag)/(Wvort_inv+Wstag_inv)
+    #V = (Wstag_inv*Vvort+Wvort_inv*Vstag)/(Wvort_inv+Wstag_inv)
+    
+    return [U, V]
