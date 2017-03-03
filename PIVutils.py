@@ -395,7 +395,7 @@ def getRandomThumbnails2D(Uf,Vf,Sf,numSamp,BoxSize):
             
     return [Ut, Vt, St]
 
-def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
+def genHairpinField(BoxSize,Circ,r,rs,Ts,Rot,StagStren,Gvort,Gstag,Conv,x=None,y=None):
     '''
     Generates a theoretical hairpin vortex velocity field given a number of parameters. Returns U and V velocity fields
     
@@ -403,7 +403,7 @@ def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
     BoxSize - 2*Boxsize+1 is the number of vectors per side of box. 
     Circ - Circulation strength of vortex 
     r - diameter of vortex solid body rotation (constant vector magnitude outside core)
-    xs, ys - x and y locations of stagnation point
+    rs, Ts - polar coordinate location of stagnation point
     Rot - Rotation of stagnation point shear layer
     StagStren - Vector magnitude of stagnation point velocity field (constant magnitude)
     Gvort - Width of blending gaussian for vortex
@@ -418,17 +418,21 @@ def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
     import numpy as np
     import math
     
-    X, Y = np.meshgrid(np.arange(-1*BoxSize, BoxSize+1), np.arange(-1*BoxSize, BoxSize+1))
+    #print((x.shape[0]-1)/2)
+    
+    if x is None:
+        X, Y = np.meshgrid(np.arange(-1*BoxSize, BoxSize+1), np.arange(-1*BoxSize, BoxSize+1))
+    else:
+        assert BoxSize==(x.shape[0]-1)/2, 'The BoxSize does not match the length of the x vector. Thats not right...'
+        assert BoxSize==(y.shape[0]-1)/2, 'The BoxSize does not match the length of the y vector. Thats not right...'
+        X, Y = np.meshgrid(x, y)
 
     U = np.zeros([2*BoxSize+1,2*BoxSize+1])
     V = U.copy()
     R = np.hypot(X, Y)
     T = np.arctan2(Y,X)
-    
-    #Create Rankine Vortex
-    Circ = 30
-    r = 3
 
+    #Vortex
     Ut = Circ*R/(2*np.pi*r**2)
     #Ut[R>=r] = Circ/(2*np.pi*R[R>=r])
     Ut[R>=r] = Circ/(2*np.pi*r)      #make velocities constant outside core
@@ -438,10 +442,11 @@ def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
     Vvort = -1*Ut*np.cos(T)
 
     #Create stagnation point flow
-    Rot = 45*np.pi/180*2 #Degrees of rotation
-    xs = -8            #shift in stagnation point in x
-    ys = -3            #shift in stagnation point in y
-    StagStren = 2;
+    Rot = Rot*np.pi/180*2
+    Ts = Ts*np.pi/180
+    xs = rs*np.cos(Ts)            #shift in stagnation point in x
+    ys = rs*np.sin(Ts)            #shift in stagnation point in y
+    #StagStren = 2;
 
     Xs = X-xs
     Ys = Y-ys;
@@ -458,9 +463,9 @@ def genHairpinField(BoxSize,Circ,r,xs,ys,Rot,StagStren,Gvort,Gstag,Conv):
     Vstag[np.isnan(V)] = 0
     
     #Combine fields 
-    Gvort_x = 5      #Radius of gaussian weighting function for vortex field
+    Gvort_x = Gvort      #Radius of gaussian weighting function for vortex field
     Gvort_y = Gvort_x
-    Gstag = 5      #Radius of gaussian weighting function for stagnation point field
+    #Gstag = 5      #Radius of gaussian weighting function for stagnation point field
 
     Wvort = np.exp(-((X**2)/(2*Gvort_x)+(Y**2)/(2*Gvort_y)))
     Wvort_inv = -1*Wvort+1                #invert the weightings so that only vortex appears at vortex location                       

@@ -32,14 +32,18 @@ def plotPODmodes2D(X,Y,Umodes,Vmodes,plotModes,saveFolder = None):
         ax[0].set_title('U - #' + str(i+1))
         ax[0].set_aspect('equal')
         ax[0].set_xlim([X.min(),X.max()])
-        ax[0].set_ylabel('y(m)')
-        ax[0].set_xlabel('x(m)')
+        ax[0].set_ylabel('$y/\delta$', fontsize=20)
+        ax[0].set_xlabel('$x/\delta$', fontsize=20)
+        ax[0].tick_params(axis='x', labelsize=12)
+        ax[0].tick_params(axis='y', labelsize=12)
         
         ax[1].set_title('V - #' + str(i+1))
         ax[1].set_aspect('equal')
         ax[1].set_xlim([X.min(),X.max()])
-        ax[1].set_ylabel('y(m)')
-        ax[1].set_xlabel('x(m)')
+        ax[1].set_ylabel('$y/\delta$', fontsize=20)
+        ax[1].set_xlabel('$x/\delta$', fontsize=20)
+        ax[1].tick_params(axis='x', labelsize=12)
+        ax[1].tick_params(axis='y', labelsize=12)
 
         cbar1 = f.colorbar(im1,ax=ax[0])
         im1.set_clim(-1*max(map(abs,cbar1.get_clim())), max(map(abs,cbar1.get_clim()))) 
@@ -398,4 +402,26 @@ def plotLLEscatter(C,ypos,St,modes,bound=None,thumb_frac=None,VecDist=None,saveF
                 
     if saveFolder is not None:
         fig.savefig(saveFolder, transparent=True, bbox_inches='tight', pad_inches=0)
-           
+
+def minfuncVecField(params, U, V, x, y):
+    import numpy as np
+    import PIVutils
+    
+    assert U.shape[0] == U.shape[1], 'Data must be a square matrix.'
+    assert U.shape    == V.shape   , 'U and V fields must be the same size'
+
+    [U2, V2] = PIVutils.genHairpinField(int((U.shape[0]-1)/2),*params,x=x,y=y)
+    
+    return np.sum(((U - U2)**2 + (V-V2)**2))
+
+def log_prior(params,bounds):
+    
+    #if params[0:7] < 0:
+    #    return -np.inf  # log(0)
+    
+    return 0
+
+def log_posterior(params, U, V, x, y, bounds):
+    import numpy as np
+    params[0:8] = np.absolute(params[0:8])
+    return log_prior(params,bounds) + -1*minfuncVecField(params, U, V, x, y)
