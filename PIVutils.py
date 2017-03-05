@@ -4,14 +4,15 @@ Most functions are for 2D data.
 '''
 
 #Import matlab PIV data
-def importMatlabPIVdata(path,mats,structs):
+def loadDataset(path,mats,structs,matlabData = None):
     '''
-    Plot 2D scalar fields
+    Import a matlab data file
     
     Inputs: 
     path - Path to the matlab file
     mats - names of the matlab matrices to be imported.
     structs - names of the structures to be imported as dictionaries
+    matlabData - flag to transpose matrices if data comes from matlab
     
     Output:
     Each of the matrices and structures in the order you specified in the input
@@ -19,7 +20,9 @@ def importMatlabPIVdata(path,mats,structs):
     
     import numpy as np
     import h5py
-    import pandas
+    
+    if matlabData is None:
+        matlabData = False
 
     f = h5py.File(path)
     
@@ -30,21 +33,67 @@ def importMatlabPIVdata(path,mats,structs):
     ret = []
 
     for i in mats:
+        #print(i)
         Temp = np.asarray(f[i])
-        if Temp.ndim == 2:
-            Temp = np.transpose(Temp,(1,0))
-        else:
-            Temp = np.transpose(Temp,(2,1,0))
+        if matlabData:
+            if Temp.ndim == 2:
+                Temp = np.transpose(Temp,(1,0))
+            elif Temp.ndim == 3:
+                Temp = np.transpose(Temp,(2,1,0))
         ret.append(Temp)
         del Temp
 
     for i in structs:
-        TempS = {k : f[i][k].value[0]       #Generate a dictionary linking all values in cond with their names
+        #print(i)
+        TempS = {k : f[i][k].value       #Generate a dictionary linking all values in cond with their names
              for k in f[i].keys()}
         ret.append(TempS)
         del TempS
         
+    f.close()
+        
     return ret
+
+#Save data to an HDF5 file
+def saveDataset(path,names,data,DictNames,DictData):
+    '''
+    Save dataset to an HDF5 file
+    
+    Inputs: 
+    path - Path to the save file
+    names - names for each set of data in list
+    data - list of data to be saved.
+    DictNames - Names of a list of dicts to save as subgroups
+    DictData - Data in the dicts
+    
+    Output:
+    An HDF5 file at the path specified
+    '''
+    
+    import h5py
+    
+    import os
+    if os.path.exists(path):
+        question = 'Delete original file (default: no)'
+        choice = query_yes_no(question, default="no")
+        if choice:
+            os.remove(path)
+            print("Original file deleted")
+
+    f = h5py.File(path)
+    
+    for i in range(len(names)):
+        #print(names[i])
+        f.create_dataset(names[i], data=data[i])
+        
+    for j in range(len(DictNames)):  
+        Set = f.create_group(DictNames[j]) #,(len(list(Cond.items())),)
+        for i in list(DictData[j].items()):
+            Set.create_dataset(i[0], data=i[1])
+        
+    print("File saved")
+    f.close()
+
 
 #Plot 2D scalar field 
 def plotScalarField(S,X=None,Y=None,bound=None,saveFolder=None):
@@ -244,19 +293,23 @@ def findBlobs(S,Thresh=None,EdgeBound=None):
     return [num_features_out, features_per_frame, labeled_array_out, cent]
 
 # given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame
-def getThumbnails2D(Uf,Vf,Sf,cent,BoxSize):
+def getThumbnails2D(mats,cent,BoxSize):
     '''
     Given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame. 
     All vectors inside frame but outside domain are padded with nans
     
     Inputs:
+    mats - A list of matrices from which to find thumbnails
+    cent - centers of each each vortex as output by FindBlobs
+    BoxSize - final thumbnail size is BoxSize*2+1 squared
     
     Outputs:
-    
+    Thumbnail versions of each of the matrices in mats
     '''
     import numpy as np
     
-    uSize = Uf.shape
+    uSize = mats[0].shape
+    out = []
     
     #find out how many features there are 
     #Round all centroids to integers
@@ -266,86 +319,28 @@ def getThumbnails2D(Uf,Vf,Sf,cent,BoxSize):
             #print(i, j)
             cent[i][j] = (int(round(cent[i][j][0])), int(round(cent[i][j][1])))
             num_features += 1
-    
-    #initialize thumbnail matrices
-    Ut = np.zeros([2*BoxSize+1,2*BoxSize+1,num_features])    
-    Ut[:] = np.NAN
-    Vt = Ut.copy()
-    St = Ut.copy()
-    #print(Ut.shape)
-    
-    #pad out velocity fields so that there are NaNs around in all directions
-    Uf2 = np.zeros([uSize[0]+2*BoxSize,uSize[1]+2*BoxSize,uSize[2]])    
-    Uf2[:] = np.NAN
-    Vf2 = Uf2.copy()
-    Sf2 = Uf2.copy()
-
-    Uf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Uf.copy()
-    Vf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Vf.copy()
-    Sf2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = Sf.copy()
-    
-    #print(Uf.shape)
-    #print(Uf2.shape)
             
-    #[f, ax] = PIVutils.plotScalarField(Sf2[:,:,0],bound=10)
+    for k in range(len(mats)):
+        #initialize thumbnail matrices
+        U = np.zeros([2*BoxSize+1,2*BoxSize+1,num_features]) 
+        U[:] = np.NAN
 
-    #for i in range(features_per_frame[1]):
-        #plt.plot(cent[0][i][1]+BoxSize,cent[0][i][0]+BoxSize,'oy',markersize=4,markeredgecolor=None)
-        
-    #Now get the thumbnails
-    thumb = 0
-    for i in range(len(cent)):
-        for j in range(len(cent[i])):
-            Ut[:,:,thumb] = Uf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i]  
-            Vt[:,:,thumb] = Vf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i] 
-            St[:,:,thumb] = Sf2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i]  
-            thumb+=1
-            
-    return [Ut, Vt, St]
+        #pad out velocity fields so that there are NaNs around in all directions
+        U2 = np.zeros([uSize[0]+2*BoxSize,uSize[1]+2*BoxSize,uSize[2]])    
+        U2[:] = np.NAN
+        U2[BoxSize:-1*BoxSize,BoxSize:-1*BoxSize,:] = mats[k].copy() 
 
-# given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame
-def getThumbnails2D_noEdge(Uf,Vf,Sf,cent,BoxSize):
-    '''
-    Given the centers of a blobs, this function disects the vector field into a number of thumbnails of size frame x frame. 
-    Domain is no longer padded with nans. A thumbnail is only taken if the center of the vortex is far enough from the frame    edges. 
-    
-    Inputs:
-    
-    Outputs:
-    
-    '''
-    import numpy as np
-    
-    uSize = Uf.shape
-    
-    #find out how many features there are 
-    #Round all centroids to integers
-    num_features = 0
-    for i in range(len(cent)):
-        for j in range(len(cent[i])):
-            #print(i, j)
-            cent[i][j] = (int(round(cent[i][j][0])), int(round(cent[i][j][1])))
-            num_features += 1
-    
-    #initialize thumbnail matrices
-    Ut = np.zeros([2*BoxSize+1,2*BoxSize+1,num_features])    
-    Ut[:] = np.NAN
-    Vt = Ut.copy()
-    St = Ut.copy()
-    #print(Ut.shape)
-    
-    #Now get the thumbnails
-    thumb = 0
-    for i in range(len(cent)):
-        for j in range(len(cent[i])):
-            if (cent[i][j][0]>BoxSize-1 and cent[i][j][0]<uSize[0]-BoxSize) and (cent[i][j][1]>BoxSize-1 and cent[i][j][1] <uSize[1]-BoxSize):
-                Ut[:,:,thumb] = Uf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]
-                Vt[:,:,thumb] = Vf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]
-                St[:,:,thumb] = Sf[cent[i][j][0]-BoxSize:cent[i][j][0]+BoxSize+1,cent[i][j][1]-BoxSize:cent[i][j][1]+BoxSize+1,i]  
+        #Now get the thumbnails
+        thumb = 0
+        for i in range(len(cent)):
+            for j in range(len(cent[i])):
+                U[:,:,thumb] = U2[cent[i][j][0]:cent[i][j][0]+2*BoxSize+1,cent[i][j][1]:cent[i][j][1]+2*BoxSize+1,i]  
                 thumb+=1
-            
-    num_features = thumb-1
-    return [Ut, Vt, St, num_features]
+                
+        out.append(U)       
+        del U   
+        
+    return out
 
 def getRandomThumbnails2D(Uf,Vf,Sf,numSamp,BoxSize):
     import numpy as np
@@ -393,7 +388,7 @@ def getRandomThumbnails2D(Uf,Vf,Sf,numSamp,BoxSize):
         St[:,:,thumb] = Sf2[Pos[0,i]:Pos[0,i]+2*BoxSize+1,Pos[1,i]:Pos[1,i]+2*BoxSize+1,Pos[2,i]]  
         thumb+=1
             
-    return [Ut, Vt, St]
+    return [Ut, Vt, St, Pos]
 
 def genHairpinField(BoxSize,Circ,r,rs,Ts,Rot,StagStren,Gvort,Gstag,Conv,x=None,y=None):
     '''
@@ -484,3 +479,38 @@ def genHairpinField(BoxSize,Circ,r,rs,Ts,Rot,StagStren,Gvort,Gstag,Conv,x=None,y
     #V = (Wstag_inv*Vvort+Wvort_inv*Vstag)/(Wvort_inv+Wstag_inv)
     
     return [U, V]
+
+def query_yes_no(question, default="yes"):
+    """Ask a yes/no question via raw_input() and return their answer.
+
+    "question" is a string that is presented to the user.
+    "default" is the presumed answer if the user just hits <Enter>.
+        It must be "yes" (the default), "no" or None (meaning
+        an answer is required of the user).
+
+    The "answer" return value is True for "yes" or False for "no".
+    """
+    
+    import sys
+    
+    valid = {"yes": True, "y": True, "ye": True,
+             "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
